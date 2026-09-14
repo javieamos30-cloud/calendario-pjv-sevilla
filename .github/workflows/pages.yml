@@ -1,0 +1,55 @@
+name: Actualizar y publicar calendario
+
+on:
+  push:
+    branches: ["main"]
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar lector de Excel
+        run: npm install --omit=dev
+
+      - name: Construir sitio
+        env:
+          EXCEL_URL: ${{ secrets.EXCEL_URL }}
+        run: |
+          mkdir -p _site
+          cp index.html _site/index.html
+          node scripts/build-calendar.mjs _site/calendar-data.json
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Preparar artefacto web
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "_site"
+
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4
